@@ -83,8 +83,8 @@ impl<'a> Header<'a> {
         );
     }
 
-    /// The crumb's box — what the pointer clicks and what the keyboard lands on — or `None` when
-    /// this header draws no crumb. One expression for the drawn mark and its target.
+    /// The crumb's box — what the D-pad lands on — or `None` when this header draws no crumb. One
+    /// expression for the drawn mark and its focus stop, so the two cannot disagree.
     pub fn crumb_rect(&self, measure: &dyn Measure) -> Option<Rect> {
         self.crumb.map(|back| self.layout.crumb_rect(back, measure))
     }
@@ -311,7 +311,7 @@ pub const BAND_BASE: u32 = 0x4000_0000;
 /// element's own range so a row index can never collide with it, and it is the key the dispatcher's
 /// chrome group (`dispatch::BACK`) seats, the page's own draw sites light, and a page's `step`
 /// answers as "go back". `screens::registry::ALERT` is the neighbouring band, `BAND_BASE` the one
-/// below it.
+/// below it, and neither is a group a page's rows live in.
 pub const CRUMB_ELEM: u32 = 0x4000_0200;
 
 impl<H: Host> Focusable<H> for BandPart<'_>
