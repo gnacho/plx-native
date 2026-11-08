@@ -128,6 +128,11 @@ Every Settings-family route draws a crumb above its title: a left chevron and th
 BACK returns to. `RouteLayout::draw_narrative` takes it as `Option<&str>` so a new route cannot
 forget to answer, and `None` means BACK leaves the app entirely.
 
+The crumb is a CONTROL, not a caption: the arrows reach it, it lights in the pill family's focus
+face, and OK runs exactly what a click on it runs. That is what makes it a way out for a viewer
+whose remote's BACK key is broken. `Screen::back_control` is where a page states the box it draws,
+and the dispatcher composes it into the focus model as one chrome group (`dispatch::BACK`).
+
 This replaced "Press [BACK] to return" across the family. The old hint spent a 60 px band restating
 a key the remote already has, and could not say where the key went, which on a three-deep push is
 the only part anybody needs. `KeyHint` survives only on the read-only ALERT panels that hold no

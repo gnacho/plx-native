@@ -814,6 +814,14 @@ impl<H: DirectoryLike> Screen<H> for RouteSurface {
     fn crumb(&self, _cx: &Cx<'_, H>) -> Option<Cow<'_, str>> {
         None
     }
+    fn back_control(&self, cx: &Cx<'_, H>) -> Option<crate::ui::Rect> {
+        // The surface IS its top page to the outside: the crumb on screen is that page's, drawn
+        // through the surface's entrance cascade, so the box the arrows land on is the same one.
+        // Without this delegation every inner page's stop would exist and no arrow could reach it,
+        // because the input owner is the surface entry.
+        let icx = inner_cx(cx);
+        self.top()?.screen.back_control(&icx)
+    }
     fn prepare(&mut self, b: &mut Budget, cx: &Cx<'_, H>) {
         let icx = inner_cx(cx);
         for e in self.inner.entries.iter_mut() {

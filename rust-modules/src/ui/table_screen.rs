@@ -70,9 +70,23 @@ impl<'a> Header<'a> {
         self
     }
 
-    /// The one drawing routine, for both loops.
-    pub fn paint(&self, p: Painter, measure: &dyn Measure) {
-        self.layout.draw_narrative(p, self.crumb, self.title, self.copy, self.copy_size, measure);
+    /// The one drawing routine, for both loops. `focused` lights the crumb when the D-pad is on it.
+    pub fn paint(&self, p: Painter, measure: &dyn Measure, focused: bool) {
+        self.layout.draw_narrative(
+            p,
+            self.crumb,
+            self.title,
+            self.copy,
+            self.copy_size,
+            measure,
+            focused,
+        );
+    }
+
+    /// The crumb's box — what the pointer clicks and what the keyboard lands on — or `None` when
+    /// this header draws no crumb. One expression for the drawn mark and its target.
+    pub fn crumb_rect(&self, measure: &dyn Measure) -> Option<Rect> {
+        self.crumb.map(|back| self.layout.crumb_rect(back, measure))
     }
 }
 
@@ -107,11 +121,25 @@ where
     unreachable!("Header has no focusable element")
 }
 
-impl<H: Host> Part<H> for Header<'_> {
+impl<H: Host> Part<H> for Header<'_>
+where
+    H::Elem: IndexElem,
+{
     fn prepare(&mut self, _b: &mut Budget, _cx: &Cx<'_, H>) {}
     fn draw(&mut self, f: &mut DrawFrame<'_, '_, H>, _rect: Rect) {
-        self.paint(f.painter, f.measure);
+        self.paint(f.painter, f.measure, crumb_focused(f));
     }
+}
+
+/// **Is this frame's focus on the crumb?** The one test every draw site uses, so "is it drawn lit"
+/// and "is it the stop the engine is on" cannot drift apart. [`CRUMB_ELEM`] is the address the
+/// dispatcher's chrome group (`dispatch::BACK`) seats, and the same one a page publishes as its
+/// Back control — see [`Screen::back_control`](super::screen::Screen::back_control).
+pub fn crumb_focused<H: Host>(f: &DrawFrame<'_, '_, H>) -> bool
+where
+    H::Elem: IndexElem,
+{
+    f.focus.current.and_then(|k| k.elem.index()) == Some(CRUMB_ELEM)
 }
 
 /// The content column as a table: a `Column` group (rules 1, 3, 5 through `Seat::Remembered`)
@@ -279,6 +307,13 @@ impl BandPart<'_> {
 /// is the same number; the library cannot name the registry).
 pub const BAND_BASE: u32 = 0x4000_0000;
 
+/// **The Back control's element address** — the crumb, in the header. It sits above every page
+/// element's own range so a row index can never collide with it, and it is the key the dispatcher's
+/// chrome group (`dispatch::BACK`) seats, the page's own draw sites light, and a page's `step`
+/// answers as "go back". `screens::registry::ALERT` is the neighbouring band, `BAND_BASE` the one
+/// below it.
+pub const CRUMB_ELEM: u32 = 0x4000_0200;
+
 impl<H: Host> Focusable<H> for BandPart<'_>
 where
     H::Elem: IndexElem,
@@ -421,9 +456,14 @@ impl<'a> TableScreen<'a> {
     }
 
     /// The legacy loop's draw: header, then table.
-    pub fn paint(&self, p: Painter, measure: &dyn Measure) {
-        self.header.paint(p, measure);
+    pub fn paint(&self, p: Painter, measure: &dyn Measure, focused: bool) {
+        self.header.paint(p, measure, focused);
         self.table.paint(p, measure);
+    }
+
+    /// The crumb's box (see [`Header::crumb_rect`]) — what this screen answers as its Back control.
+    pub fn crumb_rect(&self, measure: &dyn Measure) -> Option<Rect> {
+        self.header.crumb_rect(measure)
     }
 }
 
@@ -636,9 +676,14 @@ impl<'a> DocumentScreen<'a> {
         }
     }
 
-    pub fn paint(&mut self, p: Painter, measure: &dyn Measure) {
-        self.header.paint(p, measure);
+    pub fn paint(&mut self, p: Painter, measure: &dyn Measure, focused: bool) {
+        self.header.paint(p, measure, focused);
         self.doc.paint(p);
+    }
+
+    /// The crumb's box (see [`Header::crumb_rect`]) — what this screen answers as its Back control.
+    pub fn crumb_rect(&self, measure: &dyn Measure) -> Option<Rect> {
+        self.header.crumb_rect(measure)
     }
 }
 
