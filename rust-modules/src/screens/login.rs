@@ -1423,6 +1423,7 @@ impl LoginScreen {
             "Use your phone camera to scan the code, or link this television manually with the address and code shown here.",
             theme::size::LABEL,
             f.measure,
+            crate::ui::table_screen::crumb_focused(f),
         );
         let right = qr_layout(layout);
 

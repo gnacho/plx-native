@@ -359,3 +359,22 @@ fn a_connection_that_never_answers_is_none_rather_than_a_status_of_zero() {
     };
     assert!(loopback_get(port).is_none());
 }
+
+/// A ranged caller compares the byte it asked for with the first byte the server says it is
+/// sending. Only `Content-Range: bytes S-E/T` yields one: `bytes */T` (the unsatisfied-range
+/// answer), another unit, or no header at all must stay -1, which no requested byte equals.
+#[test]
+fn content_range_start_is_read_only_from_a_byte_range() {
+    for (head, expected) in [
+        (&b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 100-199/200\r\nContent-Length: 41\r\n\r\n"[..], 100),
+        (&b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes */200\r\nContent-Length: 0\r\n\r\n"[..], -1),
+        (&b"HTTP/1.1 200 OK\r\nContent-Length: 8\r\n\r\n"[..], -1),
+    ] {
+        let (port, h) = one_shot_server(head.to_vec());
+        let (mut hs, rv) = open_against(port);
+        assert_eq!(rv, 0, "{head:?}");
+        assert_eq!(hs_range_start(&*hs), expected, "{head:?}");
+        http_close(&mut *hs);
+        h.join().unwrap();
+    }
+}

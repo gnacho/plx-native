@@ -793,12 +793,23 @@ impl RouteLayout {
         (leading, trailing)
     }
 
-    /// Draw the return crumb — `‹ <where BACK goes>` — in the band whose top is at `top`.
+    /// **The crumb's box as the pointer clicks it and the arrows land on it.** It is the DRAWN
+    /// extent, not a padded rectangle around it: [`Self::draw_crumb`] lays the mark out at the
+    /// narrative's left edge and the word after its ink, and this is that same span. The height is
+    /// the whole band, because a caption is a small target for a pointer.
     ///
-    /// The gap between mark and word is measured to the chevron's INK, not to its box: the asset
-    /// carries about a third of its width as bearing, so a box-to-text gap on a spacing rung comes
-    /// out visibly loose and the pair stops reading as one object. Same rule the player HUD's
-    /// transport slot uses, and [`icons::ink_x`] is where the numbers live.
+    /// Measured at the size the word is DRAWN at ([`theme::size::CAPTION`]). The invariant is the
+    /// one that matters: a box measured at a smaller rung than the ink it covers is painted but not
+    /// clickable at its tail, and once the crumb is a focus stop, not reachable either. Butaca
+    /// draws the word at `BODY` and so measures at `BODY`; this tree still draws a caption.
+    pub(crate) fn crumb_rect(self, back_to: &str, measure: &dyn Measure) -> Rect {
+        let (_, ink_r) = icons::ink_x(Icon::ChevronLeft);
+        let x = self.narrative.x + CRUMB_MARK * ink_r + theme::space::XS;
+        let word_w = measure.width_str(back_to, theme::size::CAPTION, false);
+        let w = (x - self.narrative.x) + word_w;
+        Rect::new(self.narrative.x, self.narrative.y, w.min(self.narrative.w), CRUMB_BAND)
+    }
+
     /// The y the TITLE starts at, given whether a crumb precedes it.
     ///
     /// Pure and separate from [`Self::draw_narrative`] because it is the whole of the crumb's
@@ -813,9 +824,29 @@ impl RouteLayout {
         }
     }
 
-    fn draw_crumb(self, p: Painter, top: f32, back_to: &str, measure: &dyn Measure) {
+    /// Draw the return crumb — `‹ <where BACK goes>` — in the band whose top is at `top`.
+    ///
+    /// The gap between mark and word is measured to the chevron's INK, not to its box: the asset
+    /// carries about a third of its width as bearing, so a box-to-text gap on a spacing rung comes
+    /// out visibly loose and the pair stops reading as one object. Same rule the player HUD's
+    /// transport slot uses, and [`icons::ink_x`] is where the numbers live.
+    ///
+    /// `focused` is the D-pad's: the crumb is a focus stop on every route that draws one (the
+    /// dispatcher composes it as one chrome group, `dispatch::BACK`), so it wears the pill
+    /// family's focus face — the accent capsule with the dark ink over it — rather than a
+    /// treatment invented for one control. Nothing moves when it lights: the capsule is the band
+    /// the crumb already occupies, so focus never reflows the title under it.
+    fn draw_crumb(self, p: Painter, top: f32, back_to: &str, measure: &dyn Measure, focused: bool) {
         let h = CRUMB_BAND;
         let cy = top + h * 0.5;
+        let ink = if focused { theme::ACCENT_INK } else { theme::TEXT_TERTIARY };
+        if focused {
+            // The capsule stops at the narrative's left edge, i.e. on the safe margin: an inflated
+            // one would put its own edge inside the overscan exclusion zone. The chevron's bearing
+            // supplies the lead.
+            let w = (self.crumb_rect(back_to, measure).w + theme::space::XS).min(self.narrative.w);
+            p.rrect(Rect::new(self.narrative.x, top, w, h), h * 0.5, h * 0.5, theme::ACCENT);
+        }
         icons::draw(
             p,
             Icon::ChevronLeft,
@@ -825,12 +856,12 @@ impl RouteLayout {
                 CRUMB_MARK,
                 CRUMB_MARK,
             ),
-            theme::TEXT_TERTIARY,
+            ink,
         );
         let (_, ink_r) = icons::ink_x(Icon::ChevronLeft);
         let x = self.narrative.x + CRUMB_MARK * ink_r + theme::space::XS;
         let ty = crumb_label_top(cy, measure.cap_h(theme::size::CAPTION));
-        TextView::new(back_to, theme::size::CAPTION, theme::TEXT_TERTIARY)
+        TextView::new(back_to, theme::size::CAPTION, ink)
             .max_lines(1)
             .draw(p, Rect::new(x, ty, self.narrative.x + self.narrative.w - x, h));
     }
@@ -857,7 +888,8 @@ impl RouteLayout {
     /// `back_to` is `None` exactly when BACK does not go anywhere inside the app — see the module
     /// doc for which routes those are and how to census them.  Passing it here rather than letting
     /// screens draw their own line is what makes that a contract instead of a convention: a new
-    /// route cannot forget to answer without deleting an argument.
+    /// route cannot forget to answer without deleting an argument. `focused` lights the crumb in
+    /// the pill family's focus face; see [`Self::draw_crumb`].
     pub(crate) fn draw_narrative(
         self,
         p: Painter,
@@ -866,10 +898,11 @@ impl RouteLayout {
         copy: &str,
         copy_size: std::os::raw::c_int,
         measure: &dyn Measure,
+        focused: bool,
     ) {
         let top = self.narrative_top(back_to.is_some());
         if let Some(back_to) = back_to {
-            self.draw_crumb(p, self.narrative.y, back_to, measure);
+            self.draw_crumb(p, self.narrative.y, back_to, measure, focused);
         }
 
         let title = Self::narrative_title(title);
@@ -1053,6 +1086,43 @@ mod tests {
         assert!((ty + cap * 0.5 - cy).abs() < 0.01, "cap centre {} vs mark centre {}", ty + cap * 0.5, cy);
         assert!(ty > top, "a CAPTION cap band is shorter than the mark's box, so it starts inside the band");
         assert!(ty + cap < top + CRUMB_BAND, "…and ends inside it");
+    }
+
+    /// **The crumb's box is the size its word is DRAWN at.** A box measured at a smaller rung than
+    /// the ink it covers is painted but not clickable at its tail, and once the crumb is a focus
+    /// stop (`dispatch::BACK`), not reachable either. A measure whose width scales with the size is
+    /// what makes this grade the size rather than restate it.
+    #[test]
+    fn the_crumbs_box_is_measured_at_the_size_its_word_is_drawn() {
+        struct ScaledMeasure;
+        impl Measure for ScaledMeasure {
+            fn width(&self, text: &std::ffi::CStr, size: i32, _bold: bool) -> f32 {
+                text.to_string_lossy().chars().count() as f32 * size as f32 * 0.6
+            }
+            fn cap_h(&self, size: i32) -> f32 {
+                size as f32 * 0.7
+            }
+            fn line_h(&self, size: i32) -> f32 {
+                size as f32 * 1.2
+            }
+        }
+        let measure = ScaledMeasure;
+        let l = RouteLayout::screen();
+        for word in ["Home", "Settings", "Privacy and data"] {
+            let rect = l.crumb_rect(word, &measure);
+            let drawn = measure.width_str(word, theme::size::CAPTION, false);
+            assert!(
+                rect.w >= drawn,
+                "{word}: the box must cover the word as drawn ({} < {drawn})",
+                rect.w
+            );
+            assert!(
+                rect.w < drawn + CRUMB_MARK + theme::space::XS + 1.0,
+                "{word}: …and not by a whole extra mark, which is a smaller rung's box being padded"
+            );
+            assert_eq!(rect.x, l.narrative.x, "{word}: it starts on the narrative's own edge");
+            assert_eq!(rect.h, CRUMB_BAND, "{word}: the whole band is the target");
+        }
     }
 
     /// The crumb's mark and its word are ONE object, so the gap between them is measured to the

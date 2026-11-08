@@ -629,6 +629,7 @@ impl FilmographyScreen {
             &format!("{total} credits · Newest first."),
             theme::size::LABEL,
             f.measure,
+            crate::ui::table_screen::crumb_focused(f),
         );
 
         let rects = self.pill_rects(f.measure);
@@ -931,6 +932,14 @@ impl<H: ContentLike + PersonLike> Machine<H> for FilmographyScreen {
                 fx.invalidate(Provenance::Input);
                 Handled::Yes
             }
+            // The crumb: the same request BACK makes, never a card activation. The filmography is
+            // a route page, so leaving it is the content machine's own Back.
+            ScreenEvent::Activate(elem) if *elem == crate::ui::table_screen::CRUMB_ELEM => {
+                fx.push(crate::ui::machine::Fx::App(AppFx::Content(
+                    ContentReq::Back,
+                )));
+                Handled::Yes
+            }
             ScreenEvent::Activate(elem) => {
                 self.activate_focus(
                     Some(crate::ui::machine::FocusKey {
@@ -990,6 +999,12 @@ impl<H: ContentLike + PersonLike> Screen<H> for FilmographyScreen {
 
     fn crumb(&self, _cx: &Cx<'_, H>) -> Option<Cow<'_, str>> {
         Some(Cow::Owned(self.name.clone()))
+    }
+
+    fn back_control(&self, cx: &Cx<'_, H>) -> Option<crate::ui::Rect> {
+        // The same layout the draw uses, `COPY_W` included: the box the arrows land on is the box
+        // the crumb is painted in.
+        Some(RouteLayout::screen_with_copy_w(COPY_W).crumb_rect(&self.name, cx.measure))
     }
 
     fn prepare(&mut self, _budget: &mut Budget, _cx: &Cx<'_, H>) {}

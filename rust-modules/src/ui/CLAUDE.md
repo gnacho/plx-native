@@ -172,6 +172,15 @@ inside the app"** — three routes qualify today (the Settings modal, the first 
 question, and the QR sign-in), but take the census with
 `git grep -A2 'draw_narrative(' -- 'rust-modules/src/ui/*.rs'` rather than trusting that number.
 
+**The crumb is a focus stop.** `Screen::back_control` answers the box a page draws its Back control
+in (the crumb's measured rectangle, `RouteLayout::crumb_rect`), and `dispatch::PageWithStrip`
+composes that rectangle into the focus model as one chrome group (`dispatch::BACK`) beside the
+strip. So the arrows reach it, DOWN walks back into the content, and OK delivers the same
+`ScreenEvent::Activate(CRUMB_ELEM)` the page's own Back answer reads. `RouteLayout::crumb_rect`
+measures at the rung the word is DRAWN at, because a box measured smaller than its ink is painted
+but not clickable, and not reachable either. A new screen that draws a crumb MUST answer
+`back_control` or it is pointer-only again, which is the defect this closed.
+
 **It replaced `Press [BACK] to return` in the bottom action band across the whole family**, and the
 trade is the point: the hint spent a 60px band restating a key the remote already has and could not
 say where the key WENT, which on a three-deep push is the only part anybody needs. Freeing the band

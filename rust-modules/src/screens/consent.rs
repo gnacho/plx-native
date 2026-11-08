@@ -614,6 +614,14 @@ impl Machine<InnerHost> for ConsentPage {
                 }
                 Handled::Yes
             }
+            // The crumb: the same request BACK makes in Settings (the surface pops and the draft
+            // is discarded). A first-run stage has no crumb, so this arm cannot fire there.
+            ScreenEvent::Activate(e) if *e == crate::ui::table_screen::CRUMB_ELEM => {
+                if self.crumb().is_some() && !self.alert.visible() {
+                    fx.push(Fx::Nav(NavOp::Pop));
+                }
+                Handled::Yes
+            }
             ScreenEvent::Activate(e) => {
                 // **The alert traps the pointer.** A row is `Activate::Direct` (`ui/table_screen.rs`'s
                 // `TablePart::draw`), so a click anywhere on the table underneath the alert's scrim
@@ -786,13 +794,23 @@ impl Screen<InnerHost> for ConsentPage {
     fn crumb(&self, _cx: &Cx<'_, InnerHost>) -> Option<Cow<'_, str>> {
         ConsentPage::crumb(self).map(Cow::Borrowed)
     }
+    fn back_control(&self, cx: &Cx<'_, InnerHost>) -> Option<crate::ui::Rect> {
+        // A first-run stage draws no crumb, and so gains no stop: only the Settings mounting has
+        // somewhere inside the app to go back to. The delete alert owns the screen while it is up
+        // (`visible()`: open or still fading), so the crumb is not a stop the arrows may land on
+        // there — the model and the answer must say the same thing.
+        (!self.alert.visible())
+            .then(|| ConsentPage::crumb(self))
+            .flatten()
+            .map(|back| RouteLayout::screen().crumb_rect(back, cx.measure))
+    }
     fn prepare(&mut self, _b: &mut Budget, _cx: &Cx<'_, InnerHost>) {}
     fn draw(&mut self, f: &mut DrawFrame<'_, '_, InnerHost>) {
         let p = f.painter;
         let layout = RouteLayout::screen();
         Header::new(layout, self.crumb(), self.title(), self.body())
             .with_copy_size(self.copy_size())
-            .paint(p, f.measure);
+            .paint(p, f.measure, crate::ui::table_screen::crumb_focused(f));
         let labels = self.band_labels();
         let alert_open = self.alert.is_open();
         // Rule 9's guard (see `Self::uncommitted`'s doc), threaded through the SAME two builder
@@ -983,10 +1001,15 @@ crate::focusable_via_view!(PreviewPage, InnerHost, view);
 
 impl Machine<InnerHost> for PreviewPage {
     type Ev = ScreenEvent<InnerHost>;
-    fn step(&mut self, ev: &Self::Ev, _cx: &Cx<'_, InnerHost>, _fx: &mut Effects<'_, InnerHost>) -> Handled {
+    fn step(&mut self, ev: &Self::Ev, _cx: &Cx<'_, InnerHost>, fx: &mut Effects<'_, InnerHost>) -> Handled {
         match ev {
             ScreenEvent::Tick(t) => {
                 self.reader.update(t.dt());
+                Handled::Yes
+            }
+            // The crumb: back one page of the surface's own stack, the same request BACK makes.
+            ScreenEvent::Activate(e) if *e == crate::ui::table_screen::CRUMB_ELEM => {
+                fx.push(Fx::Nav(NavOp::Pop));
                 Handled::Yes
             }
             ScreenEvent::Input(InputEvent {
@@ -1031,6 +1054,9 @@ impl Screen<InnerHost> for PreviewPage {
     }
     fn crumb(&self, _cx: &Cx<'_, InnerHost>) -> Option<Cow<'_, str>> {
         Some(Cow::Borrowed(self.crumb))
+    }
+    fn back_control(&self, cx: &Cx<'_, InnerHost>) -> Option<crate::ui::Rect> {
+        Some(RouteLayout::screen().crumb_rect(self.crumb, cx.measure))
     }
     fn prepare(&mut self, _b: &mut Budget, _cx: &Cx<'_, InnerHost>) {}
     fn draw(&mut self, f: &mut DrawFrame<'_, '_, InnerHost>) {
