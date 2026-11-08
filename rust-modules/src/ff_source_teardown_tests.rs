@@ -46,6 +46,7 @@ fn a_seek_after_teardown_fails_instead_of_opening_a_second_connection() {
             stall_aborted: false,
             bounce: Vec::new(),
             bounce_pos: 0,
+            heal: HealBudget::default(),
         };
         let op = &mut st as *mut AvioState as *mut c_void;
 
@@ -102,6 +103,7 @@ fn an_aborted_read_and_seek_cannot_ping_pong_into_new_connections() {
             stall_aborted: false,
             bounce: Vec::new(),
             bounce_pos: 0,
+            heal: HealBudget::default(),
         };
         let op = &mut st as *mut AvioState as *mut c_void;
         let mut dst = [0u8; 8];
@@ -154,6 +156,7 @@ fn an_expired_candidate_deadline_stops_before_touching_its_transport() {
         stall_aborted: false,
         bounce: Vec::new(),
         bounce_pos: 0,
+        heal: HealBudget::default(),
     };
     let mut dst = [0u8; 8];
     let result = read_cb(
@@ -240,6 +243,7 @@ fn a_stalled_candidate_body_ends_at_transport_liveness_not_recursive_reserve_ret
         stall_aborted: false,
         bounce: Vec::new(),
         bounce_pos: 0,
+        heal: HealBudget::default(),
     };
     let started = std::time::Instant::now();
     let mut dst = [0u8; 8];
@@ -440,6 +444,7 @@ fn io_failed_after_drain_surfaces_once_bounce_is_empty() {
         stall_aborted: false,
         bounce: b"ABCD".to_vec(),
         bounce_pos: 0,
+        heal: HealBudget::default(),
     };
     let op = &mut st as *mut AvioState as *mut c_void;
     let mut dst = [0u8; 8];
@@ -483,6 +488,7 @@ fn take_curl_leaves_idle_and_seek_on_idle_does_not_open() {
         stall_aborted: false,
         bounce: Vec::new(),
         bounce_pos: 0,
+        heal: HealBudget::default(),
     };
     let op = &mut st as *mut AvioState as *mut c_void;
     assert_eq!(
@@ -543,6 +549,7 @@ fn a_curl_seek_after_teardown_fails_instead_of_opening_a_second_connection() {
             stall_aborted: false,
             bounce: Vec::new(),
             bounce_pos: 0,
+            heal: HealBudget::default(),
         };
         let op = &mut st as *mut AvioState as *mut c_void;
 
@@ -592,6 +599,7 @@ fn an_aborted_curl_read_and_seek_cannot_ping_pong_into_new_connections() {
             stall_aborted: false,
             bounce: Vec::new(),
             bounce_pos: 0,
+            heal: HealBudget::default(),
         };
         let op = &mut st as *mut AvioState as *mut c_void;
         let mut dst = [0u8; 8];
@@ -660,6 +668,7 @@ fn a_curl_transport_failure_crosses_avio_as_io_error_not_eof() {
             stall_aborted: false,
             bounce: Vec::new(),
             bounce_pos: 0,
+            heal: HealBudget::default(),
         };
         let op = &mut st as *mut AvioState as *mut c_void;
         let mut dst = [0u8; 8];
