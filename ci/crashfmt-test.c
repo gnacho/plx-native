@@ -87,11 +87,12 @@ int main(void) {
      * substring. The leading newline separates one crash from the last in the append-only log. */
     {
         char out[256];
-        size_t n = plx_fmt_signal(out, sizeof out - 1, 11, "SIGSEGV", 0, 0xb6f2a1c4UL, 0xb6f2a0e8UL);
+        size_t n = plx_fmt_signal(out, sizeof out - 1, 11, "SIGSEGV", 0, 0xb6f2a1c4UL, 0xb6f2a0e8UL,
+                                  1762500000UL, 4242L);
         out[n] = 0;
         eq_str("signal line",
                out,
-               "\n*** SIGNAL 11 (SIGSEGV) addr=0x0 pc=0xb6f2a1c4 lr=0xb6f2a0e8\n");
+               "\n*** SIGNAL 11 (SIGSEGV) addr=0x0 pc=0xb6f2a1c4 lr=0xb6f2a0e8 t=1762500000 pid=4242\n");
     }
     /* Truncation is silent and must not overrun. The buffer here cannot hold the whole line; the
      * only assertion that matters is that nothing past `cap` was written, which the canary
@@ -99,7 +100,8 @@ int main(void) {
     {
         char out[32];
         memset(out, '#', sizeof out);
-        size_t n = plx_fmt_signal(out, 16, 11, "SIGSEGV", 0, 0xb6f2a1c4UL, 0xb6f2a0e8UL);
+        size_t n = plx_fmt_signal(out, 16, 11, "SIGSEGV", 0, 0xb6f2a1c4UL, 0xb6f2a0e8UL,
+                                  1762500000UL, 4242L);
         eq_int("truncated length", (long)n, 16);
         eq_int("nothing written past cap", out[16], '#');
     }

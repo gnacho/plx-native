@@ -183,6 +183,12 @@ impl Machine<InnerHost> for LegalIndex {
                 self.state.sel = self.table.sel;
                 Handled::Yes
             }
+            // The header's crumb, answered here rather than by the row map: it goes back one page of
+            // the surface's own stack, which only the page knows how to ask for.
+            ScreenEvent::Activate(e) if *e == crate::ui::table_screen::CRUMB_ELEM => {
+                fx.push(Fx::Nav(NavOp::Pop));
+                Handled::Yes
+            }
             ScreenEvent::Activate(e) => {
                 self.open(*e as i32, fx);
                 Handled::Yes
@@ -212,6 +218,9 @@ impl Screen<InnerHost> for LegalIndex {
     }
     fn crumb(&self, _cx: &Cx<'_, InnerHost>) -> Option<Cow<'_, str>> {
         Some(Cow::Borrowed(CRUMB_SETTINGS))
+    }
+    fn back_control(&self, cx: &Cx<'_, InnerHost>) -> Option<crate::ui::Rect> {
+        self.view().crumb_rect(cx.measure)
     }
     fn prepare(&mut self, _b: &mut Budget, _cx: &Cx<'_, InnerHost>) {}
     fn draw(&mut self, f: &mut DrawFrame<'_, '_, InnerHost>) {
@@ -325,10 +334,15 @@ impl DocumentPage {
 
 impl Machine<InnerHost> for DocumentPage {
     type Ev = ScreenEvent<InnerHost>;
-    fn step(&mut self, ev: &Self::Ev, _cx: &Cx<'_, InnerHost>, _fx: &mut Effects<'_, InnerHost>) -> Handled {
+    fn step(&mut self, ev: &Self::Ev, _cx: &Cx<'_, InnerHost>, fx: &mut Effects<'_, InnerHost>) -> Handled {
         match ev {
             ScreenEvent::Tick(t) => {
                 self.reader.update(t.dt());
+                Handled::Yes
+            }
+            // The crumb: back one page of the surface's own stack, the same request BACK makes.
+            ScreenEvent::Activate(e) if *e == crate::ui::table_screen::CRUMB_ELEM => {
+                fx.push(Fx::Nav(NavOp::Pop));
                 Handled::Yes
             }
             ScreenEvent::Input(crate::ui::machine::InputEvent {
@@ -377,6 +391,9 @@ impl Screen<InnerHost> for DocumentPage {
     }
     fn crumb(&self, _cx: &Cx<'_, InnerHost>) -> Option<Cow<'_, str>> {
         Some(Cow::Borrowed(self.crumb))
+    }
+    fn back_control(&self, cx: &Cx<'_, InnerHost>) -> Option<crate::ui::Rect> {
+        Some(RouteLayout::screen().crumb_rect(self.crumb, cx.measure))
     }
     fn prepare(&mut self, _b: &mut Budget, _cx: &Cx<'_, InnerHost>) {}
     fn draw(&mut self, f: &mut DrawFrame<'_, '_, InnerHost>) {

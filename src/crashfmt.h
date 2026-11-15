@@ -148,13 +148,14 @@ static inline int plx_map_line_kind(const char *line, size_t n, unsigned long pc
 
 /* The record's FIRST line, which is the one every tool parses:
  *
- *     *** SIGNAL 11 (SIGSEGV) addr=0x0 pc=0xb6f2a1c4 lr=0xb6f2a0e8
+ *     *** SIGNAL 11 (SIGSEGV) addr=0x0 pc=0xb6f2a1c4 lr=0xb6f2a0e8 t=1762500000 pid=4242
  *
  * Returns the length written. `tools/crash-report.sh` reads the signal number and name out of it
  * with one sed and the two addresses with two more, all `head -1` over the block — which is why
  * the register line that follows deliberately repeats neither `pc=` nor `lr=`. */
 static inline size_t plx_fmt_signal(char *out, size_t cap, int sig, const char *name,
-                                    unsigned long addr, unsigned long pc, unsigned long lr) {
+                                    unsigned long addr, unsigned long pc, unsigned long lr,
+                                    unsigned long when, long pid) {
     struct plx_sbuf b = { out, 0, cap };
     plx_s_str(&b, "\n*** SIGNAL ");
     plx_s_dec(&b, (unsigned long)sig);
@@ -166,6 +167,16 @@ static inline size_t plx_fmt_signal(char *out, size_t cap, int sig, const char *
     plx_s_hex(&b, pc);
     plx_s_str(&b, " lr=");
     plx_s_hex(&b, lr);
+    /* WHEN and WHICH RUN, on the same line and after every field the parsers already read, so
+     * the sed patterns in `tools/crash-report.sh` keep matching unchanged. `when` is epoch
+     * seconds because `time()` is async-signal-safe and formatting a calendar date here is not;
+     * `pid` is what separates two runs that both wrote into the one append-only file, which is
+     * the whole complaint behind the bare `*** SIGNAL 6 (SIGABRT)` blocks that could be neither
+     * dated nor attributed. */
+    plx_s_str(&b, " t=");
+    plx_s_dec(&b, when);
+    plx_s_str(&b, " pid=");
+    plx_s_dec(&b, (unsigned long)pid);
     plx_s_ch(&b, '\n');
     return b.n;
 }

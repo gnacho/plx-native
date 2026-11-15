@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <time.h>
 #include <unistd.h>
 /* ARM Linux only. macOS declares `ucontext_t` behind `_XOPEN_SOURCE` and calls the routines
  * deprecated, and the host test has no use for it: the register block below is the only reader and
@@ -227,7 +228,8 @@ static void crash_handler(int sig, siginfo_t *si, void *uc) {
     unsigned long addr = si ? (unsigned long)si->si_addr : 0;
 
     struct plx_sbuf b = { rec_buf, 0, sizeof rec_buf };
-    b.n = plx_fmt_signal(rec_buf, sizeof rec_buf, sig, signame(sig), addr, pc, lr);
+    b.n = plx_fmt_signal(rec_buf, sizeof rec_buf, sig, signame(sig), addr, pc, lr,
+                         (unsigned long)time(NULL), (long)getpid());
     emit(&b);
 #if defined(__arm__)
     emit_regs(&c->uc_mcontext);

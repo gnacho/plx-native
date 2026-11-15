@@ -11,7 +11,7 @@
 #                                runtime roots, so they have their own crash logs; this picks one.
 #
 # The C tracer (src/main.c) writes, per crash:
-#     *** SIGNAL <n> (<name>) addr=0x… pc=0x… lr=0x…
+#     *** SIGNAL <n> (<name>) addr=0x… pc=0x… lr=0x… t=<epoch> pid=<pid>
 #     reg: sp=0x… fp=0x… ip=0x… cpsr=0x… r0=0x… … r10=0x…     (2026-08-29 and later builds)
 #     at:  <the /proc/self/maps line containing pc or lr>     (which library faulted)
 #     bin: <the maps line for our own binary>                 (our load base)

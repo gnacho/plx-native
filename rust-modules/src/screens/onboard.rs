@@ -410,6 +410,11 @@ impl OnboardScreen {
         }
     }
 
+    /// The crumb's word — where BACK goes: the Settings root, or the profile picker on first run.
+    fn crumb_word(&self) -> &'static str {
+        if self.settings { CRUMB_SETTINGS } else { CRUMB_PROFILES }
+    }
+
     fn labels(&self, directory: DirectoryView<'_>) -> Vec<&'static CStr> {
         if self.has_band() {
             vec![self.action_kind(directory).label()]
@@ -543,6 +548,16 @@ impl<H: DirectoryLike> Machine<H> for OnboardScreen {
             }
             ScreenEvent::FocusMoved { to, .. } => {
                 table_focus(&mut self.table, to.elem);
+                Handled::Yes
+            }
+            // The crumb: the same navigation the BACK key asks for (the surface pops in Settings,
+            // the wizard steps back on first run), never a row toggle.
+            ScreenEvent::Activate(e) if *e == crate::ui::table_screen::CRUMB_ELEM => {
+                if self.settings {
+                    fx.push(Fx::Nav(NavOp::Pop));
+                } else {
+                    fx.push(Fx::App(AppFx::Loop(LoopReq::OnboardBack)));
+                }
                 Handled::Yes
             }
             ScreenEvent::Activate(e) => {
@@ -713,7 +728,10 @@ impl<H: DirectoryLike> Screen<H> for OnboardScreen {
         &self.state
     }
     fn crumb(&self, _cx: &Cx<'_, H>) -> Option<Cow<'_, str>> {
-        Some(Cow::Borrowed(if self.settings { CRUMB_SETTINGS } else { CRUMB_PROFILES }))
+        Some(Cow::Borrowed(self.crumb_word()))
+    }
+    fn back_control(&self, cx: &Cx<'_, H>) -> Option<crate::ui::Rect> {
+        Some(RouteLayout::screen().crumb_rect(self.crumb_word(), cx.measure))
     }
     fn prepare(&mut self, _b: &mut Budget, _cx: &Cx<'_, H>) {}
     fn draw(&mut self, f: &mut DrawFrame<'_, '_, H>) {
@@ -727,11 +745,11 @@ impl<H: DirectoryLike> Screen<H> for OnboardScreen {
         let body = self.body_copy(directory);
         Header::new(
             layout,
-            Some(if self.settings { CRUMB_SETTINGS } else { CRUMB_PROFILES }),
+            Some(self.crumb_word()),
             if self.settings { SETTINGS_TITLE } else { TITLE },
             &body,
         )
-        .paint(p, f.measure);
+        .paint(p, f.measure, crate::ui::table_screen::crumb_focused(f));
         let labels = self.labels(directory);
         let pal = if self.settings { palette() } else { self.ground.palette() };
         let mut band = BandPart {
